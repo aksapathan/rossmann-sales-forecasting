@@ -1,0 +1,26 @@
+venv/
+__pycache__/
+*.pyc
+*.log
+*.db
+mlruns/
+outputs/
+
+# Backup
+app_flask_backup.py
+
+# Large trained models
+models/*.pkl
+models_backup/
+
+# Generated prediction files
+sales_predictions.csv
+sample_submission.csv
+
+# Local Kaggle datasets
+train.csv
+test.csv
+store.csv
+
+# MLflow local database
+mlflow.db

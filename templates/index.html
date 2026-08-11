@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rossmann Sales Forecast Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Rossmann Sales &amp; Customer Forecast</h1>
+    <p class="subtitle">Enter a store and forecast window, or upload a CSV of future dates.</p>
+  </header>
+
+  {% if demo_mode %}
+  <div class="banner banner-warn">
+    <strong>Demo mode:</strong> no trained model found in <code>models/</code>.
+    Showing predictions from a small synthetic-data model so the app is testable end-to-end.
+    Run <code>python train_model.py</code> with the real Rossmann
+    <code>data/train.csv</code> / <code>data/store.csv</code> to get real forecasts.
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="banner banner-error"><strong>Error:</strong> {{ error }}</div>
+  {% endif %}
+
+  <div class="grid">
+    <div class="card">
+      <h2>1. Store &amp; parameters</h2>
+      <form action="/predict" method="post" enctype="multipart/form-data" id="predict-form">
+        <label>Store ID
+          <input type="number" name="store_id" value="{{ store_id or 1 }}" min="1" required>
+        </label>
+
+        <fieldset>
+          <legend>Non-date-dependent parameters</legend>
+          <label>Store Type
+            <select name="store_type">
+              <option value="a">a</option><option value="b">b</option>
+              <option value="c">c</option><option value="d">d</option>
+            </select>
+          </label>
+          <label>Assortment
+            <select name="assortment">
+              <option value="a">basic (a)</option>
+              <option value="b">extra (b)</option>
+              <option value="c">extended (c)</option>
+            </select>
+          </label>
+          <label>Competition Distance (m)
+            <input type="number" name="competition_distance" placeholder="e.g. 1200">
+          </label>
+          <label>Promo2 (running continuing promo)
+            <select name="promo2"><option value="0">No</option><option value="1">Yes</option></select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Option A — single date</legend>
+          <label>Date
+            <input type="date" name="single_date">
+          </label>
+          <label>Promo running that day
+            <select name="promo"><option value="0">No</option><option value="1">Yes</option></select>
+          </label>
+          <label>School Holiday
+            <select name="school_holiday"><option value="0">No</option><option value="1">Yes</option></select>
+          </label>
+          <label>State Holiday
+            <select name="state_holiday">
+              <option value="0">None</option><option value="a">Public</option>
+              <option value="b">Easter</option><option value="c">Christmas</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Option B — upload CSV (overrides Option A)</legend>
+          <p class="hint">Columns: <code>Date</code> (required), <code>IsHoliday</code>, <code>IsWeekend</code>, <code>IsPromo</code>, <code>SchoolHoliday</code></p>
+          <input type="file" name="csv_file" accept=".csv">
+        </fieldset>
+
+        <button type="submit">Predict</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>2. Forecast</h2>
+      {% if table %}
+        <a class="download-btn" href="/download/{{ run_id }}">Download CSV</a>
+        <canvas id="forecastChart" height="220"></canvas>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Store</th><th>Date</th><th>Predicted Sales</th>
+                <th>Sales 95% CI</th><th>Predicted Customers</th><th>Customers 95% CI</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in table %}
+              <tr>
+                <td>{{ row.Store }}</td>
+                <td>{{ row.Date }}</td>
+                <td>{{ "%.2f"|format(row.Predicted_Sales) }}</td>
+                <td>{{ "%.0f"|format(row.Sales_CI_Lower_95) }} – {{ "%.0f"|format(row.Sales_CI_Upper_95) }}</td>
+                <td>{{ row.Predicted_Customers }}</td>
+                <td>{{ row.Customers_CI_Lower_95 }} – {{ row.Customers_CI_Upper_95 }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <script>
+          const chartData = {{ chart_data | tojson }};
+          new Chart(document.getElementById('forecastChart'), {
+            type: 'line',
+            data: {
+              labels: chartData.dates,
+              datasets: [
+                { label: 'Predicted Sales', data: chartData.sales, borderColor: '#172EDF', backgroundColor: 'rgba(23,46,223,0.1)', yAxisID: 'y', tension: 0.25 },
+                { label: 'Predicted Customers', data: chartData.customers, borderColor: '#E95C1F', backgroundColor: 'rgba(233,92,31,0.1)', yAxisID: 'y1', tension: 0.25 }
+              ]
+            },
+            options: {
+              responsive: true,
+              interaction: { mode: 'index', intersect: false },
+              scales: {
+                y: { type: 'linear', position: 'left', title: { display: true, text: 'Sales' } },
+                y1: { type: 'linear', position: 'right', title: { display: true, text: 'Customers' }, grid: { drawOnChartArea: false } }
+              }
+            }
+          });
+        </script>
+      {% else %}
+        <p class="hint">Submit the form to see predicted sales and customer numbers here, with a chart and CSV download.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</body>
+</html>
